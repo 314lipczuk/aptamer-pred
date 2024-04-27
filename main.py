@@ -2,6 +2,8 @@ import numpy as np
 import sys
 from pathlib import Path
 import typing
+from matplotlib import pyplot as plt
+import pickle
 
 # for now using RBM's impl from https://github.com/jertubiana/PGM
 # we could use other implementations, but this one provides us with log likelihoods, and most others
@@ -16,6 +18,22 @@ sys.path.append(rbm_impl_path.as_posix() + '/source/')
 sys.path.append(rbm_impl_path.as_posix() + '/utilities/')
 from PGM.source.rbm import RBM
 
+def resample(data, counts):
+  assert len(data) == len(counts)
+  total_prob = np.sum(counts)
+  probabilities = np.array(counts/ total_prob, dtype=np.float64)
+  cumulative_prob = np.zeros(len(counts), dtype=np.float64)
+  current_cumul = 0
+  resampled = []
+  for i, p in enumerate(probabilities):
+    current_cumul += p
+    cumulative_prob[i] = current_cumul
+  for i in range(len(counts)):
+    x = np.random.random()
+    idx = cumulative_prob.searchsorted(x) 
+    resampled.append(data[idx])
+  return np.copy(np.array(resampled))
+
 nucl_table = {'A':0,'C':1,"T":2,'G':3}
 def read_file(file:str):
   path = Path('./data') / file
@@ -23,13 +41,68 @@ def read_file(file:str):
   with open(path, 'r') as f:
     labels, counts, data = [],[],[]
     for line in f:
+      line = line.replace('\n','').replace('\t','')
       if line.startswith(">"):
-         labels.append(line[1:].replace('\n','').replace('\t',''))     
-         counts.append(line.split('-')[1].replace('\n','').replace('\t',''))     
+         labels.append(line[1:])     
+         counts.append(int(line.split('-')[1]))
       else:
-        data.append(np.array([nucl_table[n] for n in line.replace('\n','').replace('\t','')]))
-    return labels, counts, np.array(data)
+        data.append(np.array([nucl_table[n] for n in line]))
+    return labels, np.array(counts), np.array(data)
 
-# First the easy way - the RBM-DC-6
+print('loading data')
+# First the easy way - the RBM-DC6 (using all sequence)
 labels, counts, data = read_file('s100_6th.fasta')
-rbm = RBM()
+
+seq = np.arange(data.shape[0])
+np.random.shuffle(seq) # shuffle it, to distribute randomly
+test_size = data.shape[0] // 10 # 10% test, 90% train
+
+# data splice
+train_data = data[seq][test_size:] 
+test_data = data[seq][:test_size] 
+
+# count splice
+train_count = counts[seq][test_size:] 
+test_count = counts[seq][:test_size] 
+assert len(train_count) > len(test_count)
+
+print('data loaded')
+
+print('resampling starting')
+resampled_train = resample(train_data, train_count)
+resampled_test = resample(test_data, test_count)
+print('resampling complete')
+
+print('training starting')
+rbm = RBM(n_v=40, n_h = 100, visible='Potts', n_cv=4, hidden='dReLU')
+rbm.fit(data=resampled_train, n_iter=15, verbose=0, vverbose=1, N_MC=10)
+print('training complete')
+pickle.dump(rbm, "./trainedrbm.pkl")
+print('dumped model')
+
+fig = plt.figure(figsize=(13, 7), constrained_layout=False)
+ax = fig.add_subplot()
+ax.hist(rbm.likelihood(resampled_train), bins=50, density=True, histtype='step', lw=2, fill=False, label="Training set")
+ax.hist(rbm.likelihood(resampled_test), bins=50, density=True, histtype='step', lw=3, fill=False, label="Test set")
+print('generated plot')
+
+ax.legend(fontsize=18, loc=1)
+ax.set_xlabel("Log-likelihood", fontsize=18)
+
+fig.savefig('figure.png')
+print('saved plot')
+
+# resample training set base on count (inverse transform sampling)
+#total_prob = np.sum(train_count)
+#probabilities = np.array(train_count / total_prob, dtype=np.float64)
+#cumulative_prob = np.zeros(len(train_count), dtype=np.float64)
+#current_cumul = 0
+#resampled = []
+#for i, p in enumerate(probabilities):
+#  current_cumul += p
+#  cumulative_prob[i] = current_cumul
+#for i in range(len(train_count)):
+#  x = np.random.random()
+#  idx = cumulative_prob.searchsorted(x) 
+#  resampled.append(train_data[idx])
+#train_data = np.array(resampled)
