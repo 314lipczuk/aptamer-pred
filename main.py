@@ -74,11 +74,12 @@ resampled_test = resample(test_data, test_count)
 print('resampling complete')
 
 print('training starting')
-rbm = RBM(n_v=40, n_h = 100, visible='Potts', n_cv=4, hidden='dReLU')
-rbm.fit(data=resampled_train, n_iter=15, verbose=0, vverbose=1, N_MC=10)
+rbm = RBM(visible='Potts', hidden='dReLU', n_v=train_data.shape[1], n_h=90, n_cv=4)
+rbm.fit(data=resampled_train,batch_size=500, n_iter=15,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
 print('training complete')
-pickle.dump(rbm, "./trainedrbm.pkl")
-print('dumped model')
+with open('./trainedrbm.pkl', 'wb') as f:
+  pickle.dump(rbm,f )
+  print('dumped model')
 
 fig = plt.figure(figsize=(13, 7), constrained_layout=False)
 ax = fig.add_subplot()
