@@ -20,15 +20,16 @@ from PGM.source.rbm import RBM
 
 def resample(data, counts):
   assert len(data) == len(counts)
+  dset_size = data.shape[0]
   total_prob = np.sum(counts)
   probabilities = np.array(counts/ total_prob, dtype=np.float64)
-  cumulative_prob = np.zeros(len(counts), dtype=np.float64)
+  cumulative_prob = np.zeros(len(probabilities), dtype=np.float64)
   current_cumul = 0
   resampled = []
   for i, p in enumerate(probabilities):
     current_cumul += p
     cumulative_prob[i] = current_cumul
-  for i in range(len(counts)):
+  for i in range(dset_size):
     x = np.random.random()
     idx = cumulative_prob.searchsorted(x) 
     resampled.append(data[idx])
