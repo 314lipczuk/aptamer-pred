@@ -33,7 +33,7 @@ def resample(data, counts):
     x = np.random.random()
     idx = cumulative_prob.searchsorted(x) 
     resampled.append(data[idx])
-  return np.copy(np.array(resampled))
+  return np.copy(np.array(resampled, dtype=np.int16))
 
 nucl_table = {'A':0,'C':1,"T":2,'G':3}
 def read_file(file:str):
@@ -50,61 +50,74 @@ def read_file(file:str):
         data.append(np.array([nucl_table[n] for n in line]))
     return labels, np.array(counts), np.array(data)
 
-print('loading data')
-# First the easy way - the RBM-DC6 (using all sequence)
-labels, counts, data = read_file('s100_6th.fasta')
+def main():
+  print('loading data')
+  # First the easy way - the RBM-DC6 (using all sequence)
+  labels, counts, data = read_file('s100_6th.fasta')
 
-seq = np.arange(data.shape[0])
-np.random.shuffle(seq) # shuffle it, to distribute randomly
-test_size = data.shape[0] // 10 # 10% test, 90% train
+  seq = np.arange(data.shape[0])
+  np.random.shuffle(seq) # shuffle it, to distribute randomly
+  test_size = data.shape[0] // 10 # 10% test, 90% train
 
-# data splice
-train_data = data[seq][test_size:] 
-test_data = data[seq][:test_size] 
+  # data splice
+  train_data = data[seq][test_size:] 
+  test_data = data[seq][:test_size] 
 
-# count splice
-train_count = counts[seq][test_size:] 
-test_count = counts[seq][:test_size] 
-assert len(train_count) > len(test_count)
+  # count splice
+  train_count = counts[seq][test_size:] 
+  test_count = counts[seq][:test_size] 
+  assert len(train_count) > len(test_count)
 
-print('data loaded')
+  print('data loaded')
 
-print('resampling starting')
-resampled_train = resample(train_data, train_count)
-resampled_test = resample(test_data, test_count)
-print('resampling complete')
+  print('resampling starting')
+  resampled_train = resample(train_data, train_count)
+  resampled_test = resample(test_data, test_count)
+  print('resampling complete')
 
-print('training starting')
-rbm = RBM(visible='Potts', hidden='dReLU', n_v=train_data.shape[1], n_h=90, n_cv=4)
-rbm.fit(data=resampled_train,batch_size=500, n_iter=15,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
-print('training complete')
-with open('./trainedrbm.pkl', 'wb') as f:
-  pickle.dump(rbm,f )
-  print('dumped model')
+  print('training shape now:', resampled_train.shape)
+  print('testing shape now:',resampled_test.shape)
 
-fig = plt.figure(figsize=(13, 7), constrained_layout=False)
-ax = fig.add_subplot()
-ax.hist(rbm.likelihood(resampled_train), bins=50, density=True, histtype='step', lw=2, fill=False, label="Training set")
-ax.hist(rbm.likelihood(resampled_test), bins=50, density=True, histtype='step', lw=3, fill=False, label="Test set")
-print('generated plot')
+  #assert False
+  print('training starting')
+  rbm = RBM(visible='Potts', hidden='dReLU', n_v=train_data.shape[1], n_h=90, n_cv=4)
+  rbm.fit(data=resampled_train,batch_size=500, n_iter=2,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
+  print('training complete')
+  with open('./trainedrbm.experiment.pkl', 'wb') as f:
+    pickle.dump(rbm,f )
+    print('dumped model')
 
-ax.legend(fontsize=18, loc=1)
-ax.set_xlabel("Log-likelihood", fontsize=18)
+  rbm.likelihood(resampled_train)
+  print("done with lkh")
 
-fig.savefig('figure.png')
-print('saved plot')
+  fig = plt.figure(figsize=(13, 7), constrained_layout=False)
+  ax = fig.add_subplot()
+  ax.hist(rbm.likelihood(resampled_train), bins=50, density=True, histtype='step', lw=2, fill=False, label="Training set")
+  ax.hist(rbm.likelihood(resampled_test), bins=50, density=True, histtype='step', lw=3, fill=False, label="Test set")
+  print('generated plot')
 
-# resample training set base on count (inverse transform sampling)
-#total_prob = np.sum(train_count)
-#probabilities = np.array(train_count / total_prob, dtype=np.float64)
-#cumulative_prob = np.zeros(len(train_count), dtype=np.float64)
-#current_cumul = 0
-#resampled = []
-#for i, p in enumerate(probabilities):
-#  current_cumul += p
-#  cumulative_prob[i] = current_cumul
-#for i in range(len(train_count)):
-#  x = np.random.random()
-#  idx = cumulative_prob.searchsorted(x) 
-#  resampled.append(train_data[idx])
-#train_data = np.array(resampled)
+  ax.legend(fontsize=18, loc=1)
+  ax.set_xlabel("Log-likelihood", fontsize=18)
+
+  fig.savefig('figure.png')
+  print('saved plot')
+
+  # resample training set base on count (inverse transform sampling)
+  #total_prob = np.sum(train_count)
+  #probabilities = np.array(train_count / total_prob, dtype=np.float64)
+  #cumulative_prob = np.zeros(len(train_count), dtype=np.float64)
+  #current_cumul = 0
+  #resampled = []
+  #for i, p in enumerate(probabilities):
+  #  current_cumul += p
+  #  cumulative_prob[i] = current_cumul
+  #for i in range(len(train_count)):
+  #  x = np.random.random()
+  #  idx = cumulative_prob.searchsorted(x) 
+  #  resampled.append(train_data[idx])
+  #train_data = np.array(resampled)
+
+
+
+if __name__ == "__main__":
+  main()
