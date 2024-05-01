@@ -81,14 +81,11 @@ def main():
   #assert False
   print('training starting')
   rbm = RBM(visible='Potts', hidden='dReLU', n_v=train_data.shape[1], n_h=90, n_cv=4)
-  rbm.fit(data=resampled_train,batch_size=500, n_iter=2,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
+  rbm.fit(data=resampled_train,batch_size=500, n_iter=15,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
   print('training complete')
   with open('./trainedrbm.experiment.pkl', 'wb') as f:
     pickle.dump(rbm,f )
     print('dumped model')
-
-  rbm.likelihood(resampled_train)
-  print("done with lkh")
 
   fig = plt.figure(figsize=(13, 7), constrained_layout=False)
   ax = fig.add_subplot()
@@ -101,23 +98,6 @@ def main():
 
   fig.savefig('figure.png')
   print('saved plot')
-
-  # resample training set base on count (inverse transform sampling)
-  #total_prob = np.sum(train_count)
-  #probabilities = np.array(train_count / total_prob, dtype=np.float64)
-  #cumulative_prob = np.zeros(len(train_count), dtype=np.float64)
-  #current_cumul = 0
-  #resampled = []
-  #for i, p in enumerate(probabilities):
-  #  current_cumul += p
-  #  cumulative_prob[i] = current_cumul
-  #for i in range(len(train_count)):
-  #  x = np.random.random()
-  #  idx = cumulative_prob.searchsorted(x) 
-  #  resampled.append(train_data[idx])
-  #train_data = np.array(resampled)
-
-
 
 if __name__ == "__main__":
   main()
