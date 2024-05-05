@@ -5,7 +5,8 @@ import typing
 from matplotlib import pyplot as plt
 import pickle
 
-# for now using RBM's impl from https://github.com/jertubiana/PGM
+from tiny_rbm import RBM as MyRBM
+# for now using RBM's impl from https://github.com/jertubiana/PGM, and trying to implement my own based on some internet resources, notably https://github.com/pushpulldecoder/Restricted-Boltzmann-Machine, but with log likelihoods and gibbs sampling
 # we could use other implementations, but this one provides us with log likelihoods, and most others
 # can only do free energy in the system.
 # One day I'm gonna probably try to insert my own RBM impl here, but that day is not today
@@ -33,7 +34,8 @@ def resample(data, counts):
     x = np.random.random()
     idx = cumulative_prob.searchsorted(x) 
     resampled.append(data[idx])
-  return np.copy(np.array(resampled, dtype=np.int16))
+  #return np.copy(np.array(resampled, dtype=np.int16))
+  return np.copy(np.array(resampled, dtype=np.float64))
 
 nucl_table = {'A':0,'C':1,"T":2,'G':3}
 def read_file(file:str):
@@ -80,17 +82,25 @@ def main():
 
   #assert False
   print('training starting')
-  rbm = RBM(visible='Potts', hidden='dReLU', n_v=train_data.shape[1], n_h=90, n_cv=4)
-  rbm.fit(data=resampled_train,batch_size=500, n_iter=15,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
+
+  #rbm = RBM(visible='Potts', hidden='dReLU', n_v=train_data.shape[1], n_h=90, n_cv=4)
+  #rbm.fit(data=resampled_train,batch_size=500, n_iter=15,l1b=1e-2,verbose=0, vverbose=1, N_MC=10)
+
+  rbm = MyRBM(n_v=train_data.shape[1], n_h=90,k=4, epochs=15)
+  rbm.fit(data=resampled_train)
+
   print('training complete')
-  with open('./trainedrbm.experiment.pkl', 'wb') as f:
+  with open('./myrbm.pkl', 'wb') as f:
     pickle.dump(rbm,f )
     print('dumped model')
 
   fig = plt.figure(figsize=(13, 7), constrained_layout=False)
   ax = fig.add_subplot()
-  ax.hist(rbm.likelihood(resampled_train), bins=50, density=True, histtype='step', lw=2, fill=False, label="Training set")
-  ax.hist(rbm.likelihood(resampled_test), bins=50, density=True, histtype='step', lw=3, fill=False, label="Test set")
+  train_likelihood, test_likelihood = rbm.likelihood(resampled_train), rbm.likelihood(resampled_test)
+  print(type(train_likelihood))
+  print(train_likelihood.shape)
+  ax.hist(np.array(train_likelihood), bins=50, density=True, histtype='step', lw=2, fill=False, label="Training set")
+  ax.hist(np.array(test_likelihood), bins=50, density=True, histtype='step', lw=3, fill=False, label="Test set")
   print('generated plot')
 
   ax.legend(fontsize=18, loc=1)
